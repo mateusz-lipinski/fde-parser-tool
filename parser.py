@@ -40,18 +40,12 @@ def collect_entries(input_dir):
 
 
 def get_fieldnames(entries):
-    seen = []
-    seen_set = set()
-    for entry in entries:
-        for key in entry:
-            if key not in seen_set:
-                seen.append(key)
-                seen_set.add(key)
+    # Collect unique field names in insertion order (dict.fromkeys preserves order)
+    all_keys = dict.fromkeys(key for entry in entries for key in entry)
     # Ensure fileName and type appear as the last two columns
-    for col in ("fileName", "type"):
-        if col in seen_set:
-            seen.remove(col)
-    return seen + ["fileName", "type"]
+    fixed_cols = {"fileName", "type"}
+    base_cols = [k for k in all_keys if k not in fixed_cols]
+    return base_cols + ["fileName", "type"]
 
 
 def write_csv(entries, output_path):

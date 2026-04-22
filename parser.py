@@ -27,13 +27,13 @@ def collect_entries(input_dir):
         for entry in data.get("content", []):
             row = dict(entry)
             row["fileName"] = filename
-            row["type"] = CONTENT_TYPE
+            row["operationType"] = CONTENT_TYPE
             entries.append(row)
 
         for entry in data.get("deletedContent", []):
             row = dict(entry)
             row["fileName"] = filename
-            row["type"] = DELETED_CONTENT_TYPE
+            row["operationType"] = DELETED_CONTENT_TYPE
             entries.append(row)
 
     return entries
@@ -43,9 +43,9 @@ def get_fieldnames(entries):
     # Collect unique field names in insertion order (dict.fromkeys preserves order)
     all_keys = dict.fromkeys(key for entry in entries for key in entry)
     # Ensure fileName and type appear as the last two columns
-    fixed_cols = {"fileName", "type"}
+    fixed_cols = {"fileName", "operationType"}
     base_cols = [k for k in all_keys if k not in fixed_cols]
-    return base_cols + ["fileName", "type"]
+    return base_cols + ["fileName", "operationType"]
 
 
 def write_csv(entries, output_path):

@@ -3,38 +3,70 @@ import csv
 import json
 import os
 import sys
+import zipfile
 
 
 CONTENT_TYPE = "CONTENT"
 DELETED_CONTENT_TYPE = "DELETED_CONTENT"
+REQUIRED_FILENAME_SUBSTRING = "PriceExportJob"
+
+
+def _process_json_data(data, filename, entries):
+    for entry in data.get("content", []):
+        row = dict(entry)
+        row["fileName"] = filename
+        row["operationType"] = CONTENT_TYPE
+        entries.append(row)
+
+    for entry in data.get("deletedContent", []):
+        row = dict(entry)
+        row["fileName"] = filename
+        row["operationType"] = DELETED_CONTENT_TYPE
+        entries.append(row)
 
 
 def collect_entries(input_dir):
     entries = []
 
-    for filename in sorted(os.listdir(input_dir)):
-        if not filename.lower().endswith(".json"):
-            continue
+    all_files = sorted(os.listdir(input_dir))
+    zip_files = [f for f in all_files if f.lower().endswith(".zip")]
 
-        filepath = os.path.join(input_dir, filename)
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, OSError) as e:
-            print(f"Warning: could not read '{filepath}': {e}", file=sys.stderr)
-            continue
+    if zip_files:
+        for zip_filename in zip_files:
+            zip_path = os.path.join(input_dir, zip_filename)
+            try:
+                with zipfile.ZipFile(zip_path, "r") as zf:
+                    for name in sorted(zf.namelist()):
+                        basename = os.path.basename(name)
+                        if not basename.lower().endswith(".json"):
+                            continue
+                        if REQUIRED_FILENAME_SUBSTRING not in basename:
+                            continue
+                        try:
+                            with zf.open(name) as f:
+                                data = json.load(f)
+                        except (json.JSONDecodeError, OSError) as e:
+                            print(f"Warning: could not read '{name}' in '{zip_path}': {e}", file=sys.stderr)
+                            continue
+                        _process_json_data(data, basename, entries)
+            except OSError as e:
+                print(f"Warning: could not open '{zip_path}': {e}", file=sys.stderr)
+    else:
+        for filename in all_files:
+            if not filename.lower().endswith(".json"):
+                continue
+            if REQUIRED_FILENAME_SUBSTRING not in filename:
+                continue
 
-        for entry in data.get("content", []):
-            row = dict(entry)
-            row["fileName"] = filename
-            row["operationType"] = CONTENT_TYPE
-            entries.append(row)
+            filepath = os.path.join(input_dir, filename)
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except (json.JSONDecodeError, OSError) as e:
+                print(f"Warning: could not read '{filepath}': {e}", file=sys.stderr)
+                continue
 
-        for entry in data.get("deletedContent", []):
-            row = dict(entry)
-            row["fileName"] = filename
-            row["operationType"] = DELETED_CONTENT_TYPE
-            entries.append(row)
+            _process_json_data(data, filename, entries)
 
     return entries
 
